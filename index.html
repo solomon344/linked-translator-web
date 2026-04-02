@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedIn Translator — Say What Everyone's Thinking</title>
+  <meta name="description" content="A Chrome extension that translates corporate LinkedIn posts into what people actually mean. Brutally honest. Dangerously accurate." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #0a0a0a;
+      --paper: #f5f0e8;
+      --paper-dark: #ece6d8;
+      --red: #c8001a;
+      --muted: #6b6459;
+      --border: #2a2a2a;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE TEXTURE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    /* ── MASTHEAD ── */
+    .masthead {
+      border-bottom: 3px double var(--border);
+      padding: 0;
+      position: relative;
+    }
+
+    .masthead-top {
+      background: var(--ink);
+      padding: 8px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .masthead-meta {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #666;
+    }
+
+    .masthead-red-bar {
+      height: 4px;
+      background: var(--red);
+    }
+
+    .masthead-main {
+      padding: 24px 40px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .masthead-left {
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .masthead-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(52px, 8vw, 96px);
+      line-height: 0.9;
+      text-align: center;
+      letter-spacing: 2px;
+    }
+
+    .masthead-title span { color: var(--red); }
+
+    .masthead-right {
+      text-align: right;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .masthead-tagline {
+      text-align: center;
+      padding: 10px 40px;
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--muted);
+      border-bottom: 3px double var(--border);
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 60px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: start;
+      border-bottom: 1px solid #ccc;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .hero-headline {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(40px, 5vw, 72px);
+      line-height: 1;
+      margin-bottom: 20px;
+    }
+
+    .hero-headline span { color: var(--red); }
+
+    .hero-body {
+      font-size: 17px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 28px;
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+    }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--ink);
+      color: var(--paper);
+      text-decoration: none;
+      padding: 16px 28px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      border-radius: 4px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .hero-cta:hover { background: var(--red); transform: translateY(-2px); }
+
+    .hero-cta-sub {
+      display: block;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    /* ── TRANSLATION DEMO CARD ── */
+    .demo-card {
+      border: 2px solid var(--ink);
+      border-radius: 8px;
+      overflow: hidden;
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .demo-original {
+      background: #fff;
+      padding: 16px 20px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .demo-original-label {
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #bbb;
+      margin-bottom: 8px;
+    }
+
+    .demo-original-text {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.6;
+      font-style: italic;
+    }
+
+    .demo-result-header {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 8px 14px;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .demo-result-text {
+      background: var(--paper);
+      padding: 16px 20px;
+      font-size: 15px;
+      line-height: 1.6;
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+      color: var(--ink);
+    }
+
+    .demo-result-footer {
+      background: var(--paper-dark);
+      padding: 8px 14px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-top: 1px solid #ddd;
+    }
+
+    /* ── EXAMPLES STRIP ── */
+    .examples-section {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 60px 40px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .section-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(32px, 4vw, 52px);
+      margin-bottom: 40px;
+      max-width: 1100px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .example-card {
+      border: 1px solid #333;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .example-original {
+      padding: 14px 16px;
+      font-size: 13px;
+      color: #888;
+      font-style: italic;
+      line-height: 1.5;
+      border-bottom: 1px solid #222;
+    }
+
+    .example-arrow {
+      background: #111;
+      padding: 6px 16px;
+      font-size: 18px;
+      color: var(--red);
+    }
+
+    .example-translation {
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--paper);
+      line-height: 1.6;
+      font-family: 'DM Serif Display', serif;
+      font-style: italic;
+    }
+
+    /* ── HOW TO INSTALL ── */
+    .install-section {
+      padding: 80px 40px;
+      max-width: 1100px;
+      margin: 0 auto;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 40px;
+      margin-top: 40px;
+      counter-reset: steps;
+    }
+
+    .install-step {
+      counter-increment: steps;
+      position: relative;
+      padding-top: 50px;
+    }
+
+    .install-step::before {
+      content: counter(steps);
+      position: absolute;
+      top: 0;
+      left: 0;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 64px;
+      line-height: 1;
+      color: var(--paper-dark);
+    }
+
+    .install-step-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+
+    .install-step-body {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .install-step-body a {
+      color: var(--red);
+      text-decoration: underline;
+    }
+
+    .install-step code {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    /* ── PRICING ── */
+    .pricing-section {
+      background: var(--paper-dark);
+      padding: 80px 40px;
+      text-align: center;
+      border-top: 3px double var(--border);
+      border-bottom: 3px double var(--border);
+    }
+
+    .pricing-card {
+      display: inline-block;
+      background: var(--ink);
+      color: var(--paper);
+      border-radius: 8px;
+      padding: 40px 60px;
+      margin-top: 32px;
+      position: relative;
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--red);
+      color: #fff;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 16px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .pricing-amount {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 96px;
+      line-height: 1;
+      color: #fff;
+    }
+
+    .pricing-amount sup {
+      font-size: 40px;
+      vertical-align: super;
+    }
+
+    .pricing-period {
+      font-size: 13px;
+      color: #888;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .pricing-features {
+      list-style: none;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+
+    .pricing-features li {
+      font-size: 14px;
+      color: #ccc;
+      padding: 6px 0;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pricing-features li::before {
+      content: '✓';
+      color: #2ec27e;
+      font-weight: bold;
+    }
+
+    .btn-buy {
+      display: block;
+      background: var(--red);
+      color: #fff;
+      text-decoration: none;
+      padding: 16px 40px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 1px;
+      border-radius: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+      text-align: center;
+    }
+
+    .btn-buy:hover { opacity: 0.88; transform: translateY(-2px); }
+
+    /* ── FAQ ── */
+    .faq-section {
+      padding: 80px 40px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid #ddd;
+      padding: 20px 0;
+    }
+
+    .faq-q {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .faq-a {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: var(--ink);
+      color: #666;
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+
+    .footer-brand {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      color: var(--paper);
+      letter-spacing: 2px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+
+    .footer-links a {
+      color: #666;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover { color: var(--paper); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-up {
+      opacity: 0;
+      animation: fade-up 0.6s ease forwards;
+    }
+
+    .fade-up:nth-child(1) { animation-delay: 0.1s; }
+    .fade-up:nth-child(2) { animation-delay: 0.2s; }
+    .fade-up:nth-child(3) { animation-delay: 0.3s; }
+    .fade-up:nth-child(4) { animation-delay: 0.4s; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .masthead-main { grid-template-columns: 1fr; text-align: center; gap: 10px; }
+      .masthead-left, .masthead-right { display: none; }
+      .hero { grid-template-columns: 1fr; padding: 40px 20px; gap: 40px; }
+      .masthead-top, .masthead-tagline { padding-left: 20px; padding-right: 20px; }
+      .examples-section, .install-section, .pricing-section, .faq-section { padding-left: 20px; padding-right: 20px; }
+      .footer { flex-direction: column; gap: 16px; text-align: center; }
+      .pricing-card { padding: 40px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="masthead-red-bar"></div>
+    <div class="masthead-top">
+      <span class="masthead-meta">Est. 2025 · The Truth Department</span>
+      <span class="masthead-meta">Chrome Extension · Free to try</span>
+    </div>
+    <div class="masthead-main">
+      <div class="masthead-left">
+        Corporate speak<br>decoded daily<br>Since forever
+      </div>
+      <div class="masthead-title">LinkedIn<span>.</span><br>Translated</div>
+      <div class="masthead-right">
+        Brutally<br>honest.<br>Always.
+      </div>
+    </div>
+    <div class="masthead-tagline">
+      "The Chrome extension that says what everyone on LinkedIn is thinking but never says."
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <p class="section-label">Breaking news</p>
+      <h1 class="hero-headline fade-up">LinkedIn Posts Finally <span>Make Sense</span></h1>
+      <p class="hero-body fade-up">A Chrome extension that sits on LinkedIn and translates corporate humble-brags, performative vulnerability, and motivational fluff into plain, honest English.</p>
+      <a href="https://checkout.dodopayments.com/buy/pdt_0NbeAioqYB9igUFkOHeOW?quantity=1" class="hero-cta fade-up">
+        📰 Get Unlimited Access — $5
+      </a>
+      <span class="hero-cta-sub">✓ One-time payment &nbsp;·&nbsp; ✓ Works instantly &nbsp;·&nbsp; ✓ No subscription</span>
+    </div>
+
+    <div class="demo-card fade-up">
+      <div class="demo-original">
+        <div class="demo-original-label">Original LinkedIn post</div>
+        <div class="demo-original-text">"Excited to share that after much reflection and turning down multiple offers, I've decided to pursue a new chapter in my entrepreneurial journey. Grateful for every experience that led me here. 🙏🚀"</div>
+      </div>
+      <div class="demo-result-header">📰 What they actually mean</div>
+      <div class="demo-result-text">"I got laid off, I'm terrified, and I need everyone to think this was my idea. The emoji are doing a lot of heavy lifting."</div>
+      <div class="demo-result-footer">LinkedIn Translator · Powered by AI</div>
+    </div>
+  </section>
+
+  <!-- EXAMPLES -->
+  <section class="examples-section">
+    <div style="max-width:1100px;margin:0 auto;">
+      <p class="section-label" style="color:#555;">Real translations</p>
+      <h2 class="section-title">The Truth, Finally Told</h2>
+    </div>
+    <div class="examples-grid">
+      <div class="example-card fade-up">
+        <div class="example-original">"I failed. I lost everything. But that failure was the greatest gift I ever received. 💪"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"Please clap. I need the engagement and I've reframed my disaster into a brand."</div>
+      </div>
+      <div class="example-card fade-up">
+        <div class="example-original">"Unpopular opinion: Hard work always beats talent. Agree or disagree? Drop a comment 👇"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"I have nothing to say today but the algorithm needs feeding. Any engagement counts."</div>
+      </div>
+      <div class="example-card fade-up">
+        <div class="example-original">"A janitor at the airport taught me more about leadership than any MBA program ever could. 🌟"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"I invented a poor person to make a point about myself. The janitor did not consent to this story."</div>
+      </div>
+      <div class="example-card fade-up">
+        <div class="example-original">"Thrilled to announce I'll be joining [Big Tech] as Head of Strategic Innovation! Grateful and blessed. 🙏"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"I got a job. I need three posts out of this. This is post one."</div>
+      </div>
+      <div class="example-card fade-up">
+        <div class="example-original">"We're not just building a product. We're changing the world, one customer at a time. 🌍"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"We sell software. We are not changing the world. Our investors require us to say this."</div>
+      </div>
+      <div class="example-card fade-up">
+        <div class="example-original">"To everyone who doubted me: thank you. You were the fuel. 🔥"</div>
+        <div class="example-arrow">↓</div>
+        <div class="example-translation">"Nobody doubted me. I just want to seem like I overcame something. It's good for the personal brand."</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="install-section" id="install">
+    <p class="section-label">Get started</p>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4vw,52px);margin-bottom:8px;">Install in 3 Steps</h2>
+    <p style="color:var(--muted);font-family:'DM Serif Display',serif;font-style:italic;">Works on any Chromium browser — Chrome, Edge, Brave, Arc.</p>
+
+    <div class="install-grid">
+      <div class="install-step fade-up">
+        <div class="install-step-title">Download the extension</div>
+        <div class="install-step-body">
+          Download the <code>.zip</code> file and unzip it to a folder on your computer. Keep this folder — Chrome needs it to stay there.
+          <br><br>
+          <a download="LinkedinTranslator.zip" href="https://files.edgestore.dev/li1g6vchhfjyhtr3/publicFiles/_public/a3ee49be-ec6c-450b-bda5-c18794af6eaf.zip">Download LinkedIn Translator.zip →</a>
+        </div>
+      </div>
+      <div class="install-step fade-up">
+        <div class="install-step-title">Load it in Chrome</div>
+        <div class="install-step-body">
+          Open Chrome and go to <code>chrome://extensions</code>. Toggle on <strong>Developer Mode</strong> in the top right. Click <strong>Load unpacked</strong> and select the unzipped folder.
+        </div>
+      </div>
+      <div class="install-step fade-up">
+        <div class="install-step-title">Go to LinkedIn</div>
+        <div class="install-step-body">
+          Head to your LinkedIn feed. You'll see a <strong>📰 Translate</strong> button appear below every post. Click it. Enjoy the truth.
+        </div>
+      </div>
+      <div class="install-step fade-up">
+        <div class="install-step-title">Unlock unlimited</div>
+        <div class="install-step-body">
+          You get 5 free translations to try it out. After that, unlock unlimited for a one-time $5 payment. Click the extension icon to upgrade anytime.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing-section">
+    <p class="section-label">Pricing</p>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4vw,52px);">No Subscription Nonsense</h2>
+    <p style="color:var(--muted);font-family:'DM Serif Display',serif;font-style:italic;margin-top:8px;">Pay once. Translate forever. Like it should be.</p>
+
+    <div class="pricing-card">
+      <div class="pricing-badge">Most honest pricing on the internet</div>
+      <div class="pricing-amount"><sup>$</sup>5</div>
+      <div class="pricing-period">One time · Forever · No BS</div>
+      <ul class="pricing-features">
+        <li>Unlimited translations</li>
+        <li>Works on all LinkedIn posts</li>
+        <li>One-click copy & share</li>
+        <li>License key via email instantly</li>
+        <li>Works forever, no renewals</li>
+      </ul>
+      <a href="https://checkout.dodopayments.com/buy/pdt_0NbeAioqYB9igUFkOHeOW?quantity=1" class="btn-buy">Get Unlimited Access →</a>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq-section">
+    <p class="section-label">Questions</p>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4vw,48px);margin-bottom:32px;">Frequently Asked</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Is this a real Chrome extension?</div>
+      <div class="faq-a">Yes. It's a real, working Chrome extension that injects a Translate button on every LinkedIn post. You load it manually for now — no Chrome Web Store required.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">How do I get my license key after paying?</div>
+      <div class="faq-a">Your license key is emailed to you instantly after payment. Open the extension popup, click "Already paid?" and enter the key. Done.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Does it work on all LinkedIn posts?</div>
+      <div class="faq-a">It works on feed posts with text content. The Translate button appears automatically as you scroll through your feed.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What AI does it use?</div>
+      <div class="faq-a">Claude — trained to be brutally accurate, not just mean. The translations are savage but they hit different because they're true.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Will LinkedIn ban me for using this?</div>
+      <div class="faq-a">The extension only reads posts and adds a local button. It doesn't post anything, doesn't touch your account, and LinkedIn can't see it. You're safe.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What browsers does it work on?</div>
+      <div class="faq-a">Any Chromium-based browser — Chrome, Edge, Brave, Arc, Opera. Not Firefox (yet).</div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div>
+      <div class="footer-brand">LinkedIn Translated</div>
+      <div style="margin-top:4px;">A Side Quests product · EST. 2025</div>
+    </div>
+    <div class="footer-links">
+      <a href="#install">Install</a>
+      <a href="mailto:support@your-domain.com">Support</a>
+      <a href="https://checkout.dodopayments.com/buy/pdt_0NbeAioqYB9igUFkOHeOW?quantity=1">Buy $5</a>
+    </div>
+  </footer>
+
+</body>
+</html>
